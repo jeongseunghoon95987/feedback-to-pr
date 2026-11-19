@@ -1,4 +1,5 @@
 import type { FeedbackReport, ReportJob } from "../src/core/types";
+import type { AgentRun, AgentRunStatus, AgentRunStore } from "../src/agent/runs";
 import type { GuildConnection, Store, StoredReport } from "../src/db/store";
 import type { RepoRef } from "../src/github/api";
 import type { TriageResult } from "../src/triage/triage";
@@ -74,3 +75,37 @@ export const baseInteraction = {
   locale: "en-US",
   member: { user: { id: "user-1", username: "reporter" } },
 };
+
+export class MemoryRuns implements AgentRunStore {
+  runs: AgentRun[] = [];
+  active = false;
+  async findTenantByRepo() {
+    return "default";
+  }
+  async insertRun() {
+    return null;
+  }
+  async getRun(id: number) {
+    return this.runs.find((r) => r.id === id) ?? null;
+  }
+  async hasActiveRun() {
+    return this.active;
+  }
+  async updateRun(id: number, fields: { status: AgentRunStatus; sessionId?: string | null; error?: string | null }) {
+    const run = this.runs.find((r) => r.id === id);
+    if (run) Object.assign(run, { status: fields.status, sessionId: fields.sessionId ?? run.sessionId, error: fields.error ?? null });
+  }
+  async findRunBySession(sessionId: string) {
+    return this.runs.find((r) => r.sessionId === sessionId) ?? null;
+  }
+  async claimRun(id: number, from: AgentRunStatus, to: AgentRunStatus) {
+    const run = this.runs.find((r) => r.id === id);
+    if (!run || run.status !== from) return false;
+    run.status = to;
+    return true;
+  }
+  prNumber: number | null = null;
+  async setPullRequest(_id: number, prNumber: number) {
+    this.prNumber = prNumber;
+  }
+}

@@ -1,7 +1,7 @@
 import { createHmac, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { processAgentRun, type AgentRunner } from "../src/agent/process";
-import type { AgentRun, AgentRunStatus, AgentRunStore } from "../src/agent/runs";
+import { MemoryRuns } from "./helpers";
 import { agentRequestFrom, verifyGitHubSignature } from "../src/github/webhook";
 import { app, type Env } from "../src/index";
 
@@ -88,26 +88,6 @@ describe("POST /github/webhook", () => {
   });
 });
 
-class MemoryRuns implements AgentRunStore {
-  runs: AgentRun[] = [];
-  active = false;
-  async findTenantByRepo() {
-    return "default";
-  }
-  async insertRun() {
-    return null;
-  }
-  async getRun(id: number) {
-    return this.runs.find((r) => r.id === id) ?? null;
-  }
-  async hasActiveRun() {
-    return this.active;
-  }
-  async updateRun(id: number, fields: { status: AgentRunStatus; sessionId?: string | null; error?: string | null }) {
-    const run = this.runs.find((r) => r.id === id);
-    if (run) Object.assign(run, { status: fields.status, sessionId: fields.sessionId ?? run.sessionId, error: fields.error ?? null });
-  }
-}
 
 describe("processAgentRun", () => {
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
