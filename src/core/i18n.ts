@@ -12,6 +12,7 @@ export interface Messages {
   fieldEnvironment: string;
   received: (title: string, id: number) => string;
   invalidSubmission: string;
+  processingFailed: string;
 }
 
 const messages: Record<"en" | "ko", Messages> = {
@@ -27,6 +28,7 @@ const messages: Record<"en" | "ko", Messages> = {
     fieldEnvironment: "Version / OS / browser",
     received: (title: string, id: number) => `📝 Bug report received: **${title}** (#${id})`,
     invalidSubmission: "That report could not be read. Please try again.",
+    processingFailed: "⚠️ This report could not be processed. Please try again in a moment.",
   },
   ko: {
     guildOnly: "버그 신고는 서버에서만 보낼 수 있습니다.",
@@ -40,6 +42,7 @@ const messages: Record<"en" | "ko", Messages> = {
     fieldEnvironment: "버전 / OS / 브라우저",
     received: (title: string, id: number) => `📝 버그 신고가 접수되었습니다: **${title}** (#${id})`,
     invalidSubmission: "신고 내용을 읽지 못했습니다. 다시 시도해 주세요.",
+    processingFailed: "⚠️ 신고를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   },
 };
 

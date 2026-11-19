@@ -13,6 +13,11 @@ describe("maskText", () => {
     expect(maskText("010-1234-5678 / 02-123-4567 / 01012345678").text).toBe("[phone] / [phone] / [phone]");
   });
 
+  it("masks mobile numbers glued together or to other text", () => {
+    expect(maskText("01012345678010123456780101234567801012345678").text).toBe("[phone][phone][phone][phone]");
+    expect(maskText("연락처01012345678입니다").text).toBe("연락처[phone]입니다");
+  });
+
   it("masks international phone numbers", () => {
     expect(maskText("call +82 10-1234-5678").text).toBe("call [phone]");
   });

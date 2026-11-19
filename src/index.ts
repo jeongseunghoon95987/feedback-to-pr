@@ -47,6 +47,7 @@ app.post("/discord/interactions", async (c) => {
 export default {
   fetch: app.fetch,
   async queue(batch: MessageBatch<ReportJob>, env: Env): Promise<void> {
-    await consumeBatch(batch, { store: new D1Store(env.DB), fetch });
+    // Wrap fetch: calling the Workers global as `deps.fetch(...)` throws "Illegal invocation".
+    await consumeBatch(batch, { store: new D1Store(env.DB), fetch: (input, init) => fetch(input, init) });
   },
 } satisfies ExportedHandler<Env, ReportJob>;

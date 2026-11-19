@@ -18,22 +18,27 @@ export async function processReport(job: ReportJob, deps: ConsumerDeps): Promise
   if (!report) throw new Error(`Report ${job.reportId} not found`);
   if (report.status !== "queued") return; // already handled by an earlier delivery
 
+  const message = await editOriginalResponse(job, t(job.locale).received(report.title, report.id), deps.fetch);
+  await deps.store.markReceived(report.id, message.id);
+}
+
+/** Replaces the "thinking..." placeholder of the deferred interaction response. */
+async function editOriginalResponse(job: ReportJob, content: string, fetchFn: typeof fetch): Promise<{ id: string }> {
   const url = `${DISCORD_API}/webhooks/${job.interaction.applicationId}/${job.interaction.token}/messages/@original`;
-  const res = await deps.fetch(url, {
+  const res = await fetchFn(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      content: t(job.locale).received(report.title, report.id),
-      // Report text comes from users; never let it ping anyone.
-      allowed_mentions: { parse: [] },
-    }),
+    // Report text comes from users; never let it ping anyone.
+    body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
   });
   if (!res.ok) {
     throw new Error(`Discord edit original response failed: ${res.status} ${await res.text()}`);
   }
-  const message = (await res.json()) as { id: string };
-  await deps.store.markReceived(report.id, message.id);
+  return (await res.json()) as { id: string };
 }
+
+/** Must match max_retries for the consumer in wrangler.toml. */
+export const MAX_RETRIES = 3;
 
 export async function consumeBatch(batch: MessageBatch<ReportJob>, deps: ConsumerDeps): Promise<void> {
   for (const message of batch.messages) {
@@ -41,8 +46,18 @@ export async function consumeBatch(batch: MessageBatch<ReportJob>, deps: Consume
       await processReport(message.body, deps);
       message.ack();
     } catch (error) {
-      console.error("Failed to process report", message.body.reportId, error);
-      message.retry();
+      console.error("Failed to process report", message.body.reportId, `attempt ${message.attempts}`, error);
+      if (message.attempts <= MAX_RETRIES) {
+        message.retry();
+        continue;
+      }
+      // Last attempt: tell the reporter instead of leaving "thinking..." until the token expires.
+      try {
+        await editOriginalResponse(message.body, t(message.body.locale).processingFailed, deps.fetch);
+      } catch (notifyError) {
+        console.error("Failed to send failure notice", message.body.reportId, notifyError);
+      }
+      message.ack();
     }
   }
 }

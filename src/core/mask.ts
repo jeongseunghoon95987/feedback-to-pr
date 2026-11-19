@@ -43,9 +43,16 @@ const RULES: Rule[] = [
     pattern: /\+\d{1,3}[ -]?\(?\d{1,4}\)?[ -]?\d{3,4}[ -]?\d{4}\b/g,
   },
   {
-    // Korean mobile and landline numbers, e.g. 010-1234-5678, 02-123-4567
+    // Korean mobile numbers, e.g. 010-1234-5678. No word boundaries, so numbers
+    // glued to other digits (01012345678010...) are still caught; over-masking a
+    // long id is preferable to leaking a phone number.
     label: "[phone]",
-    pattern: /\b0(?:1[016789]|2|[3-6][1-5]|70)[- ]?\d{3,4}[- ]?\d{4}\b/g,
+    pattern: /01[016789][- ]?\d{3,4}[- ]?\d{4}/g,
+  },
+  {
+    // Korean landline and 070 numbers, e.g. 02-123-4567, 031-123-4567
+    label: "[phone]",
+    pattern: /\b0(?:2|[3-6][1-5]|70)[- ]?\d{3,4}[- ]?\d{4}\b/g,
   },
   {
     label: "[ip]",
