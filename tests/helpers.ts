@@ -1,11 +1,22 @@
 import type { FeedbackReport, ReportJob } from "../src/core/types";
 import type { GuildConnection, Store, StoredReport } from "../src/db/store";
 import type { RepoRef } from "../src/github/api";
+import type { TriageResult } from "../src/triage/triage";
 
 export class MemoryStore implements Store {
   guilds = new Map<string, GuildConnection>();
   repos = new Map<string, RepoRef>();
   reports: StoredReport[] = [];
+
+  async saveTriage(id: number, triage: TriageResult): Promise<void> {
+    const report = this.reports.find((r) => r.id === id);
+    if (report) report.triage = triage;
+  }
+
+  async markRejected(id: number, discordMessageId: string): Promise<void> {
+    const report = this.reports.find((r) => r.id === id);
+    if (report) Object.assign(report, { status: "rejected", discordMessageId });
+  }
 
   async findRepo(tenantId: string): Promise<RepoRef | null> {
     return this.repos.get(tenantId) ?? null;
@@ -22,7 +33,15 @@ export class MemoryStore implements Store {
 
   async insertReport(report: FeedbackReport): Promise<number> {
     const id = this.reports.length + 1;
-    this.reports.push({ ...report, id, status: "queued", discordMessageId: null, issueNumber: null, issueUrl: null });
+    this.reports.push({
+      ...report,
+      id,
+      status: "queued",
+      discordMessageId: null,
+      issueNumber: null,
+      issueUrl: null,
+      triage: null,
+    });
     return id;
   }
 

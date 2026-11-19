@@ -1,5 +1,6 @@
 import type { FeedbackReport, ReportFields } from "../core/types";
 import type { RepoRef } from "../github/api";
+import type { TriageResult } from "../triage/triage";
 
 /** A Discord server connected to a tenant. */
 export interface GuildConnection {
@@ -8,15 +9,20 @@ export interface GuildConnection {
   allowedChannelIds: string[] | null;
 }
 
-/** queued -> issue_created -> received. "received" means the reporter got the receipt. */
-export type ReportStatus = "queued" | "issue_created" | "received";
+/**
+ * queued -> issue_created -> received, or queued -> rejected (triaged as spam).
+ * "received" and "rejected" are final: the reporter has been told the outcome.
+ */
+export type ReportStatus = "queued" | "issue_created" | "received" | "rejected";
 
 export interface StoredReport extends FeedbackReport {
   id: number;
   status: ReportStatus;
   discordMessageId: string | null;
+  /** The issue filed for this report, or the existing issue it duplicates. */
   issueNumber: number | null;
   issueUrl: string | null;
+  triage: TriageResult | null;
 }
 
 /** Persistence used by the Discord intake and the queue consumer. */
@@ -26,8 +32,10 @@ export interface Store {
   getReport(id: number): Promise<StoredReport | null>;
   /** The repository a tenant files issues in, or null if not connected yet. */
   findRepo(tenantId: string): Promise<RepoRef | null>;
+  saveTriage(id: number, triage: TriageResult): Promise<void>;
   markIssueCreated(id: number, issueNumber: number, issueUrl: string): Promise<void>;
   markReceived(id: number, discordMessageId: string): Promise<void>;
+  markRejected(id: number, discordMessageId: string): Promise<void>;
 }
 
 interface GuildRow {
@@ -52,6 +60,7 @@ interface ReportRow {
   discord_message_id: string | null;
   issue_number: number | null;
   issue_url: string | null;
+  triage: string | null;
 }
 
 interface RepoRow {
@@ -122,7 +131,19 @@ export class D1Store implements Store {
       discordMessageId: row.discord_message_id,
       issueNumber: row.issue_number,
       issueUrl: row.issue_url,
+      triage: row.triage ? (JSON.parse(row.triage) as TriageResult) : null,
     };
+  }
+
+  async saveTriage(id: number, triage: TriageResult): Promise<void> {
+    await this.db.prepare("UPDATE reports SET triage = ? WHERE id = ?").bind(JSON.stringify(triage), id).run();
+  }
+
+  async markRejected(id: number, discordMessageId: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE reports SET status = 'rejected', discord_message_id = ? WHERE id = ?")
+      .bind(discordMessageId, id)
+      .run();
   }
 
   async findRepo(tenantId: string): Promise<RepoRef | null> {

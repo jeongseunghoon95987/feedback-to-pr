@@ -10,3 +10,11 @@ DISCORD_DEV_GUILD_ID=
 GITHUB_APP_ID=
 # The downloaded .pem on one line, with line breaks written as \n
 GITHUB_APP_PRIVATE_KEY=
+
+# AI triage (optional). Set one provider's key; without a key, issues are filed untriaged.
+#   anthropic: Claude, defaults to claude-opus-5-5
+#   openai:    GPT via Chat Completions, TRIAGE_MODEL is required
+TRIAGE_PROVIDER=
+TRIAGE_MODEL=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
