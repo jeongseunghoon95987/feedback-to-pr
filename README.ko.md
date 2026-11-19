@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-> **상태: 기획 단계.** 아직 동작하는 코드는 없습니다. 설계는 [PLAN.md](PLAN.md)를 참고하세요.
+> **상태: 초기 개발 중.** Discord 신고 접수(서명 검증, `/bug`와 메시지 신고, 개인정보 마스킹, Queue)까지 동작합니다. AI 분류, GitHub 이슈 생성, 에이전트 실행은 아직 없습니다. 설계는 [PLAN.md](PLAN.md)를 참고하세요. 개발 환경 설정은 [README.md](README.md#development)에 있습니다.
 
 Discord 커뮤니티에 올라온 버그 신고를 정리된 GitHub 이슈로 만들고, 메인테이너가 승인하면 AI 코딩 에이전트가 PR을 열고, 수정이 반영되면 신고한 사람에게 알려줍니다.
 
