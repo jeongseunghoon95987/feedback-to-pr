@@ -12,6 +12,9 @@ export interface Env {
   DISCORD_PUBLIC_KEY: string;
   DISCORD_APPLICATION_ID: string;
   DISCORD_BOT_TOKEN: string;
+  /** Optional until a repository is connected. */
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY?: string;
 }
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -48,6 +51,13 @@ export default {
   fetch: app.fetch,
   async queue(batch: MessageBatch<ReportJob>, env: Env): Promise<void> {
     // Wrap fetch: calling the Workers global as `deps.fetch(...)` throws "Illegal invocation".
-    await consumeBatch(batch, { store: new D1Store(env.DB), fetch: (input, init) => fetch(input, init) });
+    await consumeBatch(batch, {
+      store: new D1Store(env.DB),
+      fetch: (input, init) => fetch(input, init),
+      github:
+        env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY
+          ? { appId: env.GITHUB_APP_ID, privateKeyPem: env.GITHUB_APP_PRIVATE_KEY }
+          : null,
+    });
   },
 } satisfies ExportedHandler<Env, ReportJob>;
