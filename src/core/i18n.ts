@@ -12,6 +12,8 @@ export interface Messages {
   fieldEnvironment: string;
   received: (title: string, id: number) => string;
   receivedWithIssue: (title: string, id: number, issueUrl: string) => string;
+  receivedDuplicate: (title: string, id: number, issueUrl: string) => string;
+  notFiled: (title: string, id: number) => string;
   invalidSubmission: string;
   processingFailed: string;
 }
@@ -30,6 +32,10 @@ const messages: Record<"en" | "ko", Messages> = {
     received: (title: string, id: number) => `📝 Bug report received: **${title}** (#${id})`,
     receivedWithIssue: (title: string, id: number, issueUrl: string) =>
       `📝 Bug report received: **${title}** (#${id})\n🔗 Tracked in ${issueUrl}`,
+    receivedDuplicate: (title: string, id: number, issueUrl: string) =>
+      `📝 Bug report received: **${title}** (#${id})\n🔁 This looks like a known problem, so your report was added to ${issueUrl}`,
+    notFiled: (title: string, id: number) =>
+      `📝 Report **${title}** (#${id}) was not filed as an issue because it did not look like a bug report. If this is a mistake, please send it again with more detail.`,
     invalidSubmission: "That report could not be read. Please try again.",
     processingFailed: "⚠️ This report could not be processed. Please try again in a moment.",
   },
@@ -46,6 +52,10 @@ const messages: Record<"en" | "ko", Messages> = {
     received: (title: string, id: number) => `📝 버그 신고가 접수되었습니다: **${title}** (#${id})`,
     receivedWithIssue: (title: string, id: number, issueUrl: string) =>
       `📝 버그 신고가 접수되었습니다: **${title}** (#${id})\n🔗 이슈: ${issueUrl}`,
+    receivedDuplicate: (title: string, id: number, issueUrl: string) =>
+      `📝 버그 신고가 접수되었습니다: **${title}** (#${id})\n🔁 이미 알려진 문제로 보여서 기존 이슈에 신고 내용을 추가했습니다: ${issueUrl}`,
+    notFiled: (title: string, id: number) =>
+      `📝 신고 **${title}** (#${id})는 버그 신고로 보이지 않아 이슈로 등록하지 않았습니다. 잘못 판단했다면 내용을 조금 더 자세히 적어 다시 보내 주세요.`,
     invalidSubmission: "신고 내용을 읽지 못했습니다. 다시 시도해 주세요.",
     processingFailed: "⚠️ 신고를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   },

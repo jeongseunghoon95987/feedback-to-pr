@@ -28,7 +28,7 @@ describe("processReport", () => {
     const store = await storeWithReport();
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "discord-msg-1" }), { status: 200 }));
 
-    await processReport(job, { store, fetch: fetchMock as unknown as typeof fetch, github: null });
+    await processReport(job, { store, fetch: fetchMock as unknown as typeof fetch, github: null, triager: null });
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://discord.com/api/v10/webhooks/app-1/token-1/messages/@original");
@@ -43,7 +43,7 @@ describe("processReport", () => {
   it("throws so the queue retries when Discord fails", async () => {
     const store = await storeWithReport();
     const fetchMock = vi.fn(async () => new Response("rate limited", { status: 429 }));
-    await expect(processReport(job, { store, fetch: fetchMock as unknown as typeof fetch, github: null })).rejects.toThrow(/429/);
+    await expect(processReport(job, { store, fetch: fetchMock as unknown as typeof fetch, github: null, triager: null })).rejects.toThrow(/429/);
     expect(store.reports[0]?.status).toBe("queued");
   });
 
@@ -59,7 +59,7 @@ describe("processReport", () => {
         : new Response("boom", { status: 500 });
     });
     const message = (attempts: number) => ({ body: job as ReportJob, attempts, ack: vi.fn(), retry: vi.fn() });
-    const deps = { store, fetch: fetchMock as unknown as typeof fetch, github: null };
+    const deps = { store, fetch: fetchMock as unknown as typeof fetch, github: null, triager: null };
 
     const early = message(1);
     await consumeBatch({ messages: [early] } as unknown as MessageBatch<ReportJob>, deps);
@@ -77,7 +77,7 @@ describe("processReport", () => {
     const store = await storeWithReport();
     await store.markReceived(1, "existing");
     const fetchMock = vi.fn();
-    await processReport(job, { store, fetch: fetchMock as unknown as typeof fetch, github: null });
+    await processReport(job, { store, fetch: fetchMock as unknown as typeof fetch, github: null, triager: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

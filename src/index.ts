@@ -5,8 +5,9 @@ import { handleInteraction } from "./connectors/discord/interactions";
 import { verifyDiscordRequest } from "./connectors/discord/verify";
 import { consumeBatch } from "./queue/consumer";
 import { D1Store } from "./db/store";
+import { createTriager, type TriageConfig, type Triager } from "./triage";
 
-export interface Env {
+export interface Env extends TriageConfig {
   DB: D1Database;
   REPORTS_QUEUE: Queue<ReportJob>;
   DISCORD_PUBLIC_KEY: string;
@@ -58,6 +59,17 @@ export default {
         env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY
           ? { appId: env.GITHUB_APP_ID, privateKeyPem: env.GITHUB_APP_PRIVATE_KEY }
           : null,
+      triager: triagerFrom(env),
     });
   },
 } satisfies ExportedHandler<Env, ReportJob>;
+
+/** A misconfigured provider turns triage off instead of failing every report. */
+function triagerFrom(env: Env): Triager | null {
+  try {
+    return createTriager(env);
+  } catch (error) {
+    console.error("AI triage is disabled because of a configuration error:", error);
+    return null;
+  }
+}
