@@ -2,7 +2,7 @@
 
 [한국어](README.ko.md)
 
-> **Status: early development.** Discord intake works (signature check, `/bug` and message reports, masking, queue). Triage, GitHub issues and agent runs are not built yet. See [PLAN.md](PLAN.md) (Korean) for the design.
+> **Status: early development.** Discord reports become GitHub issues (signature check, `/bug` and message reports, masking, queue, GitHub App issue creation). AI triage, the report thread and agent runs are not built yet. See [PLAN.md](PLAN.md) (Korean) for the design.
 
 Turn bug reports from your Discord community into clean GitHub issues, let an AI coding agent open a pull request once a maintainer approves, and tell the reporter when the fix ships.
 
@@ -72,6 +72,13 @@ npx wrangler d1 execute feedback-to-pr --local --file scripts/seed.sql
 npm run register-commands
 npm run dev
 ```
+
+To file issues, create a GitHub App (Repository permissions → Issues: Read and write; webhook off), install it on the target repository, and:
+
+- put `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` in `.dev.vars` (the downloaded `.pem` on one line, line breaks written as `\n`; in production use `wrangler secret put GITHUB_APP_PRIVATE_KEY < key.pem`)
+- connect the repository: `INSERT INTO github_repos (tenant_id, installation_id, owner, repo) VALUES ('default', <installation id>, '<owner>', '<repo>');`
+
+Without a connected repository, reports are still acknowledged in Discord but no issue is filed.
 
 Discord needs a public HTTPS URL for the interactions endpoint (`/discord/interactions`). For local testing, expose `npm run dev` with a tunnel such as `cloudflared tunnel --url http://localhost:8787` and set that URL in the Discord developer portal.
 

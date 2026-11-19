@@ -11,6 +11,7 @@ export interface Messages {
   fieldExpected: string;
   fieldEnvironment: string;
   received: (title: string, id: number) => string;
+  receivedWithIssue: (title: string, id: number, issueUrl: string) => string;
   invalidSubmission: string;
   processingFailed: string;
 }
@@ -27,6 +28,8 @@ const messages: Record<"en" | "ko", Messages> = {
     fieldExpected: "What did you expect?",
     fieldEnvironment: "Version / OS / browser",
     received: (title: string, id: number) => `📝 Bug report received: **${title}** (#${id})`,
+    receivedWithIssue: (title: string, id: number, issueUrl: string) =>
+      `📝 Bug report received: **${title}** (#${id})\n🔗 Tracked in ${issueUrl}`,
     invalidSubmission: "That report could not be read. Please try again.",
     processingFailed: "⚠️ This report could not be processed. Please try again in a moment.",
   },
@@ -41,6 +44,8 @@ const messages: Record<"en" | "ko", Messages> = {
     fieldExpected: "기대한 동작",
     fieldEnvironment: "버전 / OS / 브라우저",
     received: (title: string, id: number) => `📝 버그 신고가 접수되었습니다: **${title}** (#${id})`,
+    receivedWithIssue: (title: string, id: number, issueUrl: string) =>
+      `📝 버그 신고가 접수되었습니다: **${title}** (#${id})\n🔗 이슈: ${issueUrl}`,
     invalidSubmission: "신고 내용을 읽지 못했습니다. 다시 시도해 주세요.",
     processingFailed: "⚠️ 신고를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   },

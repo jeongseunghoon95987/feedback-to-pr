@@ -1,4 +1,5 @@
 import type { FeedbackReport, ReportFields } from "../core/types";
+import type { RepoRef } from "../github/api";
 
 /** A Discord server connected to a tenant. */
 export interface GuildConnection {
@@ -7,10 +8,15 @@ export interface GuildConnection {
   allowedChannelIds: string[] | null;
 }
 
+/** queued -> issue_created -> received. "received" means the reporter got the receipt. */
+export type ReportStatus = "queued" | "issue_created" | "received";
+
 export interface StoredReport extends FeedbackReport {
   id: number;
-  status: string;
+  status: ReportStatus;
   discordMessageId: string | null;
+  issueNumber: number | null;
+  issueUrl: string | null;
 }
 
 /** Persistence used by the Discord intake and the queue consumer. */
@@ -18,6 +24,9 @@ export interface Store {
   findGuild(guildId: string): Promise<GuildConnection | null>;
   insertReport(report: FeedbackReport): Promise<number>;
   getReport(id: number): Promise<StoredReport | null>;
+  /** The repository a tenant files issues in, or null if not connected yet. */
+  findRepo(tenantId: string): Promise<RepoRef | null>;
+  markIssueCreated(id: number, issueNumber: number, issueUrl: string): Promise<void>;
   markReceived(id: number, discordMessageId: string): Promise<void>;
 }
 
@@ -39,8 +48,16 @@ interface ReportRow {
   title: string;
   fields: string;
   redactions: number;
-  status: string;
+  status: ReportStatus;
   discord_message_id: string | null;
+  issue_number: number | null;
+  issue_url: string | null;
+}
+
+interface RepoRow {
+  installation_id: number;
+  owner: string;
+  repo: string;
 }
 
 export class D1Store implements Store {
@@ -103,7 +120,24 @@ export class D1Store implements Store {
       redactions: row.redactions,
       status: row.status,
       discordMessageId: row.discord_message_id,
+      issueNumber: row.issue_number,
+      issueUrl: row.issue_url,
     };
+  }
+
+  async findRepo(tenantId: string): Promise<RepoRef | null> {
+    const row = await this.db
+      .prepare("SELECT installation_id, owner, repo FROM github_repos WHERE tenant_id = ?")
+      .bind(tenantId)
+      .first<RepoRow>();
+    return row ? { installationId: row.installation_id, owner: row.owner, repo: row.repo } : null;
+  }
+
+  async markIssueCreated(id: number, issueNumber: number, issueUrl: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE reports SET status = 'issue_created', issue_number = ?, issue_url = ? WHERE id = ?")
+      .bind(issueNumber, issueUrl, id)
+      .run();
   }
 
   async markReceived(id: number, discordMessageId: string): Promise<void> {
