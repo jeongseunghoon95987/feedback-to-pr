@@ -1,0 +1,26 @@
+{
+  "name": "feedback-to-pr",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Turn untrusted community feedback into safe GitHub issues and agent-generated pull requests.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply feedback-to-pr --local",
+    "db:migrate:remote": "wrangler d1 migrations apply feedback-to-pr --remote",
+    "register-commands": "node --env-file=.dev.vars scripts/register-commands.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.13.19"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261119.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1",
+    "wrangler": "^4.165.0"
+  }
+}

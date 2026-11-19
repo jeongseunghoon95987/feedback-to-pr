@@ -2,7 +2,7 @@
 
 [한국어](README.ko.md)
 
-> **Status: planning.** There is no working code yet. See [PLAN.md](PLAN.md) (Korean) for the design.
+> **Status: early development.** Discord intake works (signature check, `/bug` and message reports, masking, queue). Triage, GitHub issues and agent runs are not built yet. See [PLAN.md](PLAN.md) (Korean) for the design.
 
 Turn bug reports from your Discord community into clean GitHub issues, let an AI coding agent open a pull request once a maintainer approves, and tell the reporter when the fix ships.
 
@@ -56,6 +56,29 @@ Merge               the bot replies in the reporter's Discord thread
 **Later**
 - Web feedback form, Channel Talk, Intercom, email
 - A hosted version with one-click GitHub App and Discord installs
+
+## Development
+
+Requires Node.js 22+ and a Cloudflare account.
+
+```sh
+npm install
+cp .dev.vars.example .dev.vars          # fill in your Discord application values
+npx wrangler d1 create feedback-to-pr   # put the printed id in wrangler.toml
+npx wrangler queues create feedback-to-pr-reports
+npm run db:migrate:local
+cp scripts/seed.example.sql scripts/seed.sql   # set your server id
+npx wrangler d1 execute feedback-to-pr --local --file scripts/seed.sql
+npm run register-commands
+npm run dev
+```
+
+Discord needs a public HTTPS URL for the interactions endpoint (`/discord/interactions`). For local testing, expose `npm run dev` with a tunnel such as `cloudflared tunnel --url http://localhost:8787` and set that URL in the Discord developer portal.
+
+```sh
+npm test            # unit tests
+npm run typecheck
+```
 
 ## Built with
 

@@ -1,0 +1,24 @@
+name = "feedback-to-pr"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
+#   DISCORD_PUBLIC_KEY      - "Public Key" on the Discord application's General Information page
+#   DISCORD_APPLICATION_ID  - "Application ID" on the same page
+#   DISCORD_BOT_TOKEN       - used by scripts/register-commands.mjs and, later, for thread replies
+
+[[d1_databases]]
+binding = "DB"
+database_name = "feedback-to-pr"
+# Replace with the id printed by `wrangler d1 create feedback-to-pr`
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[queues.producers]]
+binding = "REPORTS_QUEUE"
+queue = "feedback-to-pr-reports"
+
+[[queues.consumers]]
+queue = "feedback-to-pr-reports"
+max_batch_size = 10
+max_retries = 3
