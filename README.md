@@ -57,6 +57,12 @@ Merge               the bot replies in the reporter's Discord thread
 - Web feedback form, Channel Talk, Intercom, email
 - A hosted version with one-click GitHub App and Discord installs
 
+## Agent fix workflow
+
+The goal is one-click setup: connect GitHub and Discord, and approved issues turn into draft pull requests with nothing added to your repository. That server-side agent is planned.
+
+Today, an advanced GitHub Actions workflow does the same inside your own repository: it hands an approved issue to Claude Code, which opens a draft pull request, using a Claude API key or a Claude subscription token. See [docs/agent-workflow.md](docs/agent-workflow.md).
+
 ## Development
 
 Requires Node.js 22+ and a Cloudflare account.
