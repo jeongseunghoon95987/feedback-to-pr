@@ -234,7 +234,7 @@ interface Connector {
 
 ### v0.2 — 딸깍: 에이전트를 우리 쪽에서 실행
 - [ ] **서버 쪽 코딩 에이전트**: `agent:go` 라벨 웹훅 → 격리 환경에서 Claude가 저장소를 받아 수정 → 우리 GitHub App으로 브랜치 푸시와 Draft PR 생성
-  - 실행 환경 후보 비교: Claude Managed Agents / Cloudflare Containers (비용, 시간 제한, 격리 수준, 저장소 접근 방식)
+  - 실행 환경 비교와 설계: [docs/design/server-agent.md](docs/design/server-agent.md). **Claude Managed Agents로 시작** (2026-11-19 결정), 실행기는 인터페이스로 분리
   - 에이전트 권한: 해당 저장소 하나에만, 코드와 PR 쓰기만. 워크플로 파일 수정 금지
   - 신뢰하지 않는 입력 규칙은 Actions 템플릿과 같은 내용을 쓴다
 - [ ] GitHub App 권한 확장: Issues + **Contents, Pull requests 쓰기** + 이슈 라벨 웹훅
