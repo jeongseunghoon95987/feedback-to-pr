@@ -1,6 +1,9 @@
 name = "feedback-to-pr"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
+# Serve on https://feedback-to-pr.<account>.workers.dev; no public per-version preview URLs.
+workers_dev = true
+preview_urls = false
 
 # Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
 #   DISCORD_PUBLIC_KEY      - "Public Key" on the Discord application's General Information page
@@ -10,8 +13,8 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "feedback-to-pr"
-# Replace with the id printed by `wrangler d1 create feedback-to-pr`
-database_id = "00000000-0000-0000-0000-000000000000"
+# The id printed by `wrangler d1 create feedback-to-pr`; replace it when deploying your own copy
+database_id = "331c3b71-d741-4719-80cb-b433a4f721e2"
 migrations_dir = "migrations"
 
 [[queues.producers]]
