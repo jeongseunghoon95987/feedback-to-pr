@@ -11,11 +11,13 @@
     "db:migrate:local": "wrangler d1 migrations apply feedback-to-pr --local",
     "db:migrate:remote": "wrangler d1 migrations apply feedback-to-pr --remote",
     "register-commands": "node --env-file=.dev.vars scripts/register-commands.mjs",
+    "setup-agent": "node --env-file=.dev.vars scripts/setup-managed-agent.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",
+    "diff": "^9.0.0",
     "hono": "^4.13.19"
   },
   "devDependencies": {

@@ -30,16 +30,24 @@ export interface AppCredentials {
   privateKeyPem: string;
 }
 
+/** Narrows a token below the installation's permissions, e.g. read-only access to one repository. */
+export interface TokenScope {
+  repositories: string[];
+  permissions: Record<string, "read" | "write">;
+}
+
 export async function getInstallationToken(
   credentials: AppCredentials,
   installationId: number,
   fetchFn: typeof fetch,
+  scope?: TokenScope,
 ): Promise<string> {
   const key = await importPrivateKey(credentials.privateKeyPem);
   const jwt = await createAppJwt(credentials.appId, key);
   const res = await fetchFn(`${GITHUB_API}/app/installations/${installationId}/access_tokens`, {
     method: "POST",
-    headers: githubHeaders(`Bearer ${jwt}`),
+    headers: scope ? { ...githubHeaders(`Bearer ${jwt}`), "Content-Type": "application/json" } : githubHeaders(`Bearer ${jwt}`),
+    ...(scope ? { body: JSON.stringify(scope) } : {}),
   });
   if (!res.ok) {
     throw new Error(`GitHub installation token request failed: ${res.status} ${await res.text()}`);

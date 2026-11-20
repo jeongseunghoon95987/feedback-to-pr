@@ -1,6 +1,7 @@
 import type { AgentRequest } from "../github/webhook";
 
-export type AgentRunStatus = "queued" | "running" | "succeeded" | "failed" | "rejected";
+/** queued -> running -> finishing -> succeeded | failed, or queued -> rejected */
+export type AgentRunStatus = "queued" | "running" | "finishing" | "succeeded" | "failed" | "rejected";
 
 export interface AgentRun extends AgentRequest {
   id: number;
@@ -17,6 +18,12 @@ export interface AgentJob {
   runId: number;
 }
 
+/** Queue message sent when a Managed Agents session stops. */
+export interface AgentCompleteJob {
+  kind: "agent_complete";
+  sessionId: string;
+}
+
 export interface AgentRunStore {
   /** The tenant that connected this repository, or null if it is not connected. */
   findTenantByRepo(owner: string, repo: string): Promise<string | null>;
@@ -26,6 +33,10 @@ export interface AgentRunStore {
   /** True if another run for the same issue is queued or running. */
   hasActiveRun(run: AgentRun): Promise<boolean>;
   updateRun(id: number, fields: { status: AgentRunStatus; sessionId?: string | null; error?: string | null }): Promise<void>;
+  findRunBySession(sessionId: string): Promise<AgentRun | null>;
+  /** Moves a run from one status to another only if it is still in `from`; false if another worker got there first. */
+  claimRun(id: number, from: AgentRunStatus, to: AgentRunStatus): Promise<boolean>;
+  setPullRequest(id: number, prNumber: number): Promise<void>;
 }
 
 interface RunRow {
@@ -67,13 +78,33 @@ export class D1AgentRunStore implements AgentRunStore {
   }
 
   async getRun(id: number): Promise<AgentRun | null> {
+    return this.selectRun("r.id = ?", id);
+  }
+
+  async findRunBySession(sessionId: string): Promise<AgentRun | null> {
+    return this.selectRun("r.session_id = ?", sessionId);
+  }
+
+  async claimRun(id: number, from: AgentRunStatus, to: AgentRunStatus): Promise<boolean> {
+    const result = await this.db
+      .prepare("UPDATE agent_runs SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?")
+      .bind(to, id, from)
+      .run();
+    return (result.meta.changes ?? 0) > 0;
+  }
+
+  async setPullRequest(id: number, prNumber: number): Promise<void> {
+    await this.db.prepare("UPDATE agent_runs SET pr_number = ? WHERE id = ?").bind(prNumber, id).run();
+  }
+
+  private async selectRun(where: string, value: string | number): Promise<AgentRun | null> {
     const row = await this.db
       .prepare(
         `SELECT r.*, g.installation_id FROM agent_runs r
          JOIN github_repos g ON g.tenant_id = r.tenant_id
-         WHERE r.id = ?`,
+         WHERE ${where}`,
       )
-      .bind(id)
+      .bind(value)
       .first<RunRow & { installation_id: number }>();
     if (!row) return null;
     return {
@@ -96,7 +127,7 @@ export class D1AgentRunStore implements AgentRunStore {
       .prepare(
         `SELECT 1 FROM agent_runs
          WHERE tenant_id = ? AND owner = ? AND repo = ? AND issue_number = ?
-           AND id != ? AND status IN ('queued', 'running')
+           AND id != ? AND status IN ('queued', 'running', 'finishing')
          LIMIT 1`,
       )
       .bind(run.tenantId, run.owner, run.repo, run.issueNumber, run.id)

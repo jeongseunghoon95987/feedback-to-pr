@@ -7,12 +7,21 @@ import { consumeBatch } from "./queue/consumer";
 import { D1Store } from "./db/store";
 import { createTriager, type TriageConfig, type Triager } from "./triage";
 import { agentRequestFrom, verifyGitHubSignature } from "./github/webhook";
-import { D1AgentRunStore, type AgentJob } from "./agent/runs";
-import { consumeAgentMessages } from "./agent/process";
+import Anthropic from "@anthropic-ai/sdk";
+import { D1AgentRunStore, type AgentCompleteJob, type AgentJob } from "./agent/runs";
+import { consumeAgentMessages, type AgentRunner } from "./agent/process";
+import { completeAgentRun } from "./agent/complete";
+import { ManagedAgentRunner, ManagedAgentSessions, type AgentSessions } from "./agent/managed";
 import type { AppCredentials } from "./github/auth";
 
-/** Reports and agent runs share one queue; agent jobs carry kind: "agent". */
-export type QueueJob = ReportJob | AgentJob;
+/** Reports and agent work share one queue; agent jobs carry a `kind`. */
+export type QueueJob = ReportJob | AgentJob | AgentCompleteJob;
+
+/** Default spend cap per agent session, in US cents. */
+const DEFAULT_AGENT_BUDGET_CENTS = 200;
+
+/** Session events that mean the agent stopped and its result can be collected. */
+const SESSION_STOP_EVENTS = new Set(["session.status_idled", "session.status_terminated", "session.budget_reached"]);
 
 export interface Env extends TriageConfig {
   DB: D1Database;
@@ -25,6 +34,13 @@ export interface Env extends TriageConfig {
   GITHUB_APP_PRIVATE_KEY?: string;
   /** The GitHub App's webhook secret; required for /github/webhook. */
   GITHUB_WEBHOOK_SECRET?: string;
+  /** Server-side coding agent (Claude Managed Agents). Create the IDs with `npm run setup-agent`. */
+  MANAGED_AGENT_ID?: string;
+  MANAGED_ENVIRONMENT_ID?: string;
+  /** Spend cap per session in US cents (default 200 = $2). */
+  AGENT_BUDGET_CENTS?: string;
+  /** Signing key (whsec_...) of the Managed Agents webhook endpoint registered in the Claude Console. */
+  ANTHROPIC_WEBHOOK_SIGNING_KEY?: string;
 }
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -91,6 +107,28 @@ app.post("/github/webhook", async (c) => {
   return c.text("queued", 202);
 });
 
+/**
+ * Claude Managed Agents webhook (registered in the Claude Console). When a
+ * session stops, collect its result on the queue.
+ */
+app.post("/anthropic/webhook", async (c) => {
+  const key = c.env.ANTHROPIC_WEBHOOK_SIGNING_KEY;
+  if (!key) return c.text("webhook not configured", 503);
+  const body = await c.req.text();
+
+  let event: { data: { type: string; id: string } };
+  try {
+    const client = new Anthropic({ apiKey: c.env.ANTHROPIC_API_KEY ?? "unused-for-verification" });
+    event = client.beta.webhooks.unwrap(body, { headers: Object.fromEntries(c.req.raw.headers), key });
+  } catch {
+    return c.text("invalid signature", 401);
+  }
+
+  if (!SESSION_STOP_EVENTS.has(event.data.type)) return c.text("ignored", 202);
+  await c.env.REPORTS_QUEUE.send({ kind: "agent_complete", sessionId: event.data.id });
+  return c.text("queued", 202);
+});
+
 export default {
   fetch: app.fetch,
   async queue(batch: MessageBatch<QueueJob>, env: Env): Promise<void> {
@@ -98,8 +136,10 @@ export default {
     const fetchFn: typeof fetch = (input, init) => fetch(input, init);
     const github = githubCredentials(env);
 
-    const agentMessages = batch.messages.filter((m): m is Message<AgentJob> => isAgentJob(m.body));
-    const reportMessages = batch.messages.filter((m): m is Message<ReportJob> => !isAgentJob(m.body));
+    const kindOf = (job: QueueJob) => ("kind" in job ? job.kind : "report");
+    const reportMessages = batch.messages.filter((m): m is Message<ReportJob> => kindOf(m.body) === "report");
+    const agentMessages = batch.messages.filter((m): m is Message<AgentJob> => kindOf(m.body) === "agent");
+    const completeMessages = batch.messages.filter((m): m is Message<AgentCompleteJob> => kindOf(m.body) === "agent_complete");
 
     if (reportMessages.length) {
       await consumeBatch({ ...batch, messages: reportMessages } as MessageBatch<ReportJob>, {
@@ -109,20 +149,43 @@ export default {
         triager: triagerFrom(env),
       });
     }
+
+    const runs = new D1AgentRunStore(env.DB);
+    const sessions = agentSessionsFrom(env);
     if (agentMessages.length) {
-      await consumeAgentMessages(agentMessages, {
-        runs: new D1AgentRunStore(env.DB),
-        fetch: fetchFn,
-        github,
-        // The Managed Agents runner is added in the next step.
-        runner: null,
-      });
+      const runner: AgentRunner | null =
+        sessions && github ? new ManagedAgentRunner({ sessions, github, fetch: fetchFn, budgetCents: budgetCents(env) }) : null;
+      await consumeAgentMessages(agentMessages, { runs, fetch: fetchFn, github, runner });
+    }
+    for (const message of completeMessages) {
+      if (!sessions || !github) {
+        console.error("Agent session finished but the agent or GitHub App is not configured; dropping", message.body.sessionId);
+        message.ack();
+        continue;
+      }
+      try {
+        await completeAgentRun(message.body, { runs, sessions, github, fetch: fetchFn });
+        message.ack();
+      } catch (error) {
+        console.error("Failed to complete agent run for session", message.body.sessionId, error);
+        message.retry();
+      }
     }
   },
 } satisfies ExportedHandler<Env, QueueJob>;
 
-function isAgentJob(job: QueueJob): job is AgentJob {
-  return (job as AgentJob).kind === "agent";
+function agentSessionsFrom(env: Env): AgentSessions | null {
+  if (!env.ANTHROPIC_API_KEY || !env.MANAGED_AGENT_ID || !env.MANAGED_ENVIRONMENT_ID) return null;
+  return new ManagedAgentSessions({
+    apiKey: env.ANTHROPIC_API_KEY,
+    agentId: env.MANAGED_AGENT_ID,
+    environmentId: env.MANAGED_ENVIRONMENT_ID,
+  });
+}
+
+function budgetCents(env: Env): number {
+  const value = Number.parseInt(env.AGENT_BUDGET_CENTS ?? "", 10);
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_AGENT_BUDGET_CENTS;
 }
 
 function githubCredentials(env: Env): AppCredentials | null {
