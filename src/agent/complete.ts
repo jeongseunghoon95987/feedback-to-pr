@@ -66,13 +66,13 @@ export async function completeAgentRun(job: AgentCompleteJob, deps: CompleteDeps
     });
 
     const branch = `feedback-to-pr/issue-${run.issueNumber}`;
-    const commitSha = await commitChanges(token, repo, head, changes, `Fix #${run.issueNumber} (feedback-to-pr agent)`, deps.fetch);
+    const commitSha = await commitChanges(token, repo, head, changes, `Resolve #${run.issueNumber} (feedback-to-pr agent)`, deps.fetch);
     await setBranch(token, repo, branch, commitSha, deps.fetch);
     const pr = await openDraftPullRequest(
       token,
       repo,
       {
-        title: `Fix #${run.issueNumber}`,
+        title: `Resolve #${run.issueNumber}`,
         head: branch,
         base: baseBranch,
         body: [
