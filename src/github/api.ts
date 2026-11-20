@@ -61,6 +61,55 @@ export async function addIssueComment(
   }
 }
 
+/** The user's permission on the repository: admin, maintain, write, triage, read or none. */
+export async function getUserPermission(
+  token: string,
+  repo: Pick<RepoRef, "owner" | "repo">,
+  username: string,
+  fetchFn: typeof fetch,
+): Promise<string> {
+  const res = await fetchFn(
+    `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/collaborators/${encodeURIComponent(username)}/permission`,
+    { headers: githubHeaders(`Bearer ${token}`) },
+  );
+  if (res.status === 404) return "none";
+  if (!res.ok) {
+    throw new Error(`GitHub permission check failed: ${res.status} ${await res.text()}`);
+  }
+  return ((await res.json()) as { permission: string }).permission;
+}
+
+/** Removes one label (ignoring "not present") and adds others. */
+export async function swapLabels(
+  token: string,
+  repo: Pick<RepoRef, "owner" | "repo">,
+  issueNumber: number,
+  remove: string | null,
+  add: string[],
+  fetchFn: typeof fetch,
+): Promise<void> {
+  const base = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/issues/${issueNumber}/labels`;
+  if (remove) {
+    const res = await fetchFn(`${base}/${encodeURIComponent(remove)}`, {
+      method: "DELETE",
+      headers: githubHeaders(`Bearer ${token}`),
+    });
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`GitHub remove label failed: ${res.status} ${await res.text()}`);
+    }
+  }
+  if (add.length) {
+    const res = await fetchFn(base, {
+      method: "POST",
+      headers: { ...githubHeaders(`Bearer ${token}`), "Content-Type": "application/json" },
+      body: JSON.stringify({ labels: add }),
+    });
+    if (!res.ok) {
+      throw new Error(`GitHub add labels failed: ${res.status} ${await res.text()}`);
+    }
+  }
+}
+
 export function issueUrl(repo: RepoRef, issueNumber: number): string {
   return `https://github.com/${repo.owner}/${repo.repo}/issues/${issueNumber}`;
 }

@@ -10,6 +10,8 @@ DISCORD_DEV_GUILD_ID=
 GITHUB_APP_ID=
 # The downloaded .pem on one line, with line breaks written as \n
 GITHUB_APP_PRIVATE_KEY=
+# The GitHub App's webhook secret (App settings -> Webhook). Needed for agent:go.
+GITHUB_WEBHOOK_SECRET=
 
 # AI triage (optional). Set one provider's key; without a key, issues are filed untriaged.
 #   anthropic: Claude, defaults to claude-opus-5-5
