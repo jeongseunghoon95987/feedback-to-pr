@@ -27,6 +27,12 @@ MANAGED_AGENT_ID=
 MANAGED_ENVIRONMENT_ID=
 # Spend cap per agent session in US cents (default 200 = $2)
 AGENT_BUDGET_CENTS=
+
+# Usage limits (optional). Empty means no limit; months are UTC calendar months.
+#   reports per Discord user per hour, reports per server per month, agent runs per month
+LIMIT_REPORTS_PER_USER_HOUR=
+LIMIT_REPORTS_PER_MONTH=
+LIMIT_AGENT_RUNS_PER_MONTH=
 # Claude Console -> Webhooks: endpoint https://<worker>/anthropic/webhook, events
 # session.status_idled, session.status_terminated, session.budget_reached
 ANTHROPIC_WEBHOOK_SIGNING_KEY=

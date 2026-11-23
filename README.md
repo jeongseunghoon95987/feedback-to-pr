@@ -92,7 +92,7 @@ npm run deploy                                   # prints https://feedback-to-pr
 ```
 
 Set the secrets with `npx wrangler secret put <NAME>` (the private key: `npx wrangler secret put GITHUB_APP_PRIVATE_KEY < key.pem`):
-`DISCORD_PUBLIC_KEY`, `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY`, `MANAGED_AGENT_ID`, `MANAGED_ENVIRONMENT_ID`, and optionally `AGENT_BUDGET_CENTS` and `TRIAGE_MODEL`.
+`DISCORD_PUBLIC_KEY`, `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY`, `MANAGED_AGENT_ID`, `MANAGED_ENVIRONMENT_ID`, and optionally `AGENT_BUDGET_CENTS`, `TRIAGE_MODEL` and the usage limits `LIMIT_REPORTS_PER_USER_HOUR`, `LIMIT_REPORTS_PER_MONTH` and `LIMIT_AGENT_RUNS_PER_MONTH` (empty means no limit).
 
 **5. Point the services at the Worker**
 - Discord portal → General Information → Interactions Endpoint URL: `https://<your worker>/discord/interactions`. Discord checks the URL before saving, so deploy first.
@@ -115,6 +115,7 @@ feedback-to-pr itself is free (MIT). When you self-host, you pay Cloudflare and 
 To spend less:
 - Set `TRIAGE_MODEL=claude-haiku-5-5` ($0.10 / $0.50 per million tokens, well under a cent per report). Triage quality on Haiku has not been measured yet.
 - Lower `AGENT_BUDGET_CENTS`. A smaller cap means hard issues may stop without a patch.
+- Set usage limits: `LIMIT_REPORTS_PER_USER_HOUR` (per Discord user), `LIMIT_REPORTS_PER_MONTH` (per server) and `LIMIT_AGENT_RUNS_PER_MONTH`. A report over a limit is refused with a private message to the reporter; an `agent:go` over the limit gets a comment and no run.
 - Spam is filtered before an issue is created, and agent runs only happen after a maintainer approves.
 
 ## Pricing plan for the hosted version (draft)

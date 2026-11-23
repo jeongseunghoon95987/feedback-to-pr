@@ -16,6 +16,8 @@ export interface Messages {
   notFiled: (title: string, id: number) => string;
   invalidSubmission: string;
   processingFailed: string;
+  userRateLimited: string;
+  monthlyLimitReached: string;
 }
 
 const messages: Record<"en" | "ko", Messages> = {
@@ -38,6 +40,9 @@ const messages: Record<"en" | "ko", Messages> = {
       `📝 Report **${title}** (#${id}) was not filed as an issue because it did not look like a bug report. If this is a mistake, please send it again with more detail.`,
     invalidSubmission: "That report could not be read. Please try again.",
     processingFailed: "⚠️ This report could not be processed. Please try again in a moment.",
+    userRateLimited: "You have sent several reports in the last hour. Please wait a while before sending another.",
+    monthlyLimitReached:
+      "This server has reached its report limit for this month, so the report was not sent. Ask a server admin, or try again next month.",
   },
   ko: {
     guildOnly: "버그 신고는 서버에서만 보낼 수 있습니다.",
@@ -58,6 +63,9 @@ const messages: Record<"en" | "ko", Messages> = {
       `📝 신고 **${title}** (#${id})는 버그 신고로 보이지 않아 이슈로 등록하지 않았습니다. 잘못 판단했다면 내용을 조금 더 자세히 적어 다시 보내 주세요.`,
     invalidSubmission: "신고 내용을 읽지 못했습니다. 다시 시도해 주세요.",
     processingFailed: "⚠️ 신고를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    userRateLimited: "최근 1시간 동안 신고를 여러 번 보내셨습니다. 잠시 뒤에 다시 보내 주세요.",
+    monthlyLimitReached:
+      "이 서버는 이번 달 신고 한도에 도달해서 신고를 보내지 않았습니다. 서버 관리자에게 문의하거나 다음 달에 다시 보내 주세요.",
   },
 };
 

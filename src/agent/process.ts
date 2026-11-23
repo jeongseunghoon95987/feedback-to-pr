@@ -1,6 +1,7 @@
 import { addIssueComment, getUserPermission, swapLabels, type RepoRef } from "../github/api";
 import { getInstallationToken, type AppCredentials } from "../github/auth";
 import { AGENT_FAILED_LABEL, AGENT_GO_LABEL, AGENT_WORKING_LABEL } from "../github/webhook";
+import type { UsageGate } from "../core/usage";
 import type { AgentJob, AgentRun, AgentRunStore } from "./runs";
 
 /** Must match max_retries for the consumer in wrangler.toml. */
@@ -33,6 +34,8 @@ export interface AgentDeps {
   fetch: typeof fetch;
   github: AppCredentials | null;
   runner: AgentRunner | null;
+  /** Usage limits; without it agent runs are not limited. */
+  usage?: UsageGate;
 }
 
 const WRITE_PERMISSIONS = new Set(["admin", "maintain", "write"]);
@@ -77,6 +80,17 @@ export async function processAgentRun(job: AgentJob, deps: AgentDeps): Promise<v
     await swapLabels(token, repo, run.issueNumber, AGENT_GO_LABEL, [AGENT_FAILED_LABEL], deps.fetch);
     await comment("The server-side coding agent is not configured for this installation, so no run was started.");
     await deps.runs.updateRun(run.id, { status: "failed", error: "runner not configured" });
+    return;
+  }
+
+  // Counted last, so a run rejected above does not use up the monthly allowance.
+  if (deps.usage && !(await deps.usage.allowAgentRun(run.tenantId))) {
+    await swapLabels(token, repo, run.issueNumber, AGENT_GO_LABEL, [AGENT_FAILED_LABEL], deps.fetch);
+    await comment(
+      "This repository has reached its coding agent limit for this month, so no run was started. " +
+        "The label can be added again next month.",
+    );
+    await deps.runs.updateRun(run.id, { status: "rejected", error: "monthly agent run limit" });
     return;
   }
 

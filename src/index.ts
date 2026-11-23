@@ -13,6 +13,8 @@ import { consumeAgentMessages, type AgentRunner } from "./agent/process";
 import { completeAgentRun } from "./agent/complete";
 import { ManagedAgentRunner, ManagedAgentSessions, type AgentSessions } from "./agent/managed";
 import type { AppCredentials } from "./github/auth";
+import { parseLimits, type LimitConfig } from "./core/usage";
+import { D1UsageGate } from "./db/usage";
 
 /** Reports and agent work share one queue; agent jobs carry a `kind`. */
 export type QueueJob = ReportJob | AgentJob | AgentCompleteJob;
@@ -23,7 +25,7 @@ const DEFAULT_AGENT_BUDGET_CENTS = 200;
 /** Session events that mean the agent stopped and its result can be collected. */
 const SESSION_STOP_EVENTS = new Set(["session.status_idled", "session.status_terminated", "session.budget_reached"]);
 
-export interface Env extends TriageConfig {
+export interface Env extends TriageConfig, LimitConfig {
   DB: D1Database;
   REPORTS_QUEUE: Queue<QueueJob>;
   DISCORD_PUBLIC_KEY: string;
@@ -69,6 +71,7 @@ app.post("/discord/interactions", async (c) => {
     enqueue: async (job) => {
       await c.env.REPORTS_QUEUE.send(job);
     },
+    usage: new D1UsageGate(c.env.DB, parseLimits(c.env)),
   });
   return c.json(response);
 });
@@ -155,7 +158,13 @@ export default {
     if (agentMessages.length) {
       const runner: AgentRunner | null =
         sessions && github ? new ManagedAgentRunner({ sessions, github, fetch: fetchFn, budgetCents: budgetCents(env) }) : null;
-      await consumeAgentMessages(agentMessages, { runs, fetch: fetchFn, github, runner });
+      await consumeAgentMessages(agentMessages, {
+        runs,
+        fetch: fetchFn,
+        github,
+        runner,
+        usage: new D1UsageGate(env.DB, parseLimits(env)),
+      });
     }
     for (const message of completeMessages) {
       if (!sessions || !github) {
