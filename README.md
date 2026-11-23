@@ -100,6 +100,8 @@ Set the secrets with `npx wrangler secret put <NAME>` (the private key: `npx wra
 - Claude Console → Webhooks: add `https://<your worker>/anthropic/webhook` with the events `session.status_idled`, `session.status_terminated` and `session.budget_reached`, then `npx wrangler secret put ANTHROPIC_WEBHOOK_SIGNING_KEY` with the signing key it shows.
 - Register the slash command: `npm run register-commands`.
 
+**Optional: connect from Discord instead of seed SQL.** In the GitHub App settings set the Callback URL to `https://<your worker>/connect/github/callback` and the Setup URL to `https://<your worker>/connect/github/setup` (with "Redirect on update"), generate a client secret, and set `PUBLIC_BASE_URL`, `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`. A member with Manage Server then runs `/connect`, signs in to GitHub and picks a repository they administer. Set `CONNECT_INVITE_REQUIRED=true` to require an invite code from the `invite_codes` table. Design: [docs/design/hosted-onboarding.md](docs/design/hosted-onboarding.md) (Korean).
+
 Test it with `/bug` in your server. Short test text is usually classified as spam and closed without an issue; a concrete report creates one. Add `agent:go` to that issue to get a draft pull request. `npx wrangler tail` shows the requests as they arrive.
 
 ## Costs

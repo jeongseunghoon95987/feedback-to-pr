@@ -3,6 +3,7 @@ import { t, type Messages } from "../../core/i18n";
 import type { FeedbackReport, ReportFields, ReportJob } from "../../core/types";
 import type { GuildConnection, Store } from "../../db/store";
 import type { UsageGate } from "../../core/usage";
+import { CONNECT_COMMAND, handleConnectCommand, type ConnectCommandDeps } from "../../connect/command";
 import {
   CommandType,
   ComponentType,
@@ -21,6 +22,8 @@ export interface InteractionDeps {
   enqueue: (job: ReportJob) => Promise<void>;
   /** Usage limits; without it reports are not limited. */
   usage?: UsageGate;
+  /** /connect onboarding; null or missing when this deployment does not offer it. */
+  connect?: ConnectCommandDeps | null;
 }
 
 const BUG_COMMAND = "bug";
@@ -52,6 +55,15 @@ export async function handleInteraction(
 
   if (interaction.type !== InteractionType.APPLICATION_COMMAND && interaction.type !== InteractionType.MODAL_SUBMIT) {
     return ephemeral(msg.invalidSubmission);
+  }
+
+  // /connect runs before the server is connected, so it skips the connection check.
+  if (
+    interaction.type === InteractionType.APPLICATION_COMMAND &&
+    interaction.data?.type === CommandType.CHAT_INPUT &&
+    interaction.data.name === CONNECT_COMMAND
+  ) {
+    return handleConnectCommand(interaction, deps.connect ?? null, msg);
   }
 
   const guild = await checkGuild(interaction, deps.store, msg);

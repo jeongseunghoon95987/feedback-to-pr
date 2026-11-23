@@ -14,5 +14,24 @@
     "contexts": [0],
     "integration_types": [0],
     "default_member_permissions": "8192"
+  },
+  {
+    "name": "connect",
+    "type": 1,
+    "description": "Connect this server to a GitHub repository",
+    "description_localizations": { "ko": "이 서버를 GitHub 저장소에 연결합니다" },
+    "contexts": [0],
+    "integration_types": [0],
+    "default_member_permissions": "32",
+    "options": [
+      {
+        "name": "code",
+        "type": 3,
+        "description": "Invite code, if this deployment asks for one",
+        "description_localizations": { "ko": "초대 코드 (필요한 경우)" },
+        "required": false,
+        "max_length": 64
+      }
+    ]
   }
 ]
