@@ -1,6 +1,7 @@
 import { createHmac, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { processAgentRun, type AgentRunner } from "../src/agent/process";
+import type { UsageGate } from "../src/core/usage";
 import { MemoryRuns } from "./helpers";
 import { agentRequestFrom, verifyGitHubSignature } from "../src/github/webhook";
 import { app, type Env } from "../src/index";
@@ -93,7 +94,7 @@ describe("processAgentRun", () => {
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const github = { appId: "1", privateKeyPem: privateKey.export({ type: "pkcs1", format: "pem" }).toString() };
 
-  async function run(options: { permission?: string; active?: boolean; runner?: AgentRunner | null }) {
+  async function run(options: { permission?: string; active?: boolean; runner?: AgentRunner | null; usage?: UsageGate }) {
     const runs = new MemoryRuns();
     runs.active = options.active ?? false;
     runs.runs.push({
@@ -120,7 +121,13 @@ describe("processAgentRun", () => {
     });
     await processAgentRun(
       { kind: "agent", runId: 1 },
-      { runs, fetch: fetchMock as unknown as typeof fetch, github, runner: options.runner === undefined ? null : options.runner },
+      {
+        runs,
+        fetch: fetchMock as unknown as typeof fetch,
+        github,
+        runner: options.runner === undefined ? null : options.runner,
+        usage: options.usage,
+      },
     );
     const labelsAdded = calls.filter((c) => c.method === "POST" && c.url.endsWith("/labels")).flatMap((c) => (c.body as { labels: string[] }).labels);
     const labelsRemoved = calls.filter((c) => c.method === "DELETE").map((c) => decodeURIComponent(c.url.split("/labels/")[1]!));
@@ -158,6 +165,30 @@ describe("processAgentRun", () => {
     expect(r.run).toMatchObject({ status: "running", sessionId: "sesn_1" });
     expect(r.labelsRemoved).toEqual(["agent:go"]);
     expect(r.labelsAdded).toEqual(["agent:working"]);
+  });
+
+  it("stops at the monthly agent run limit without starting the runner", async () => {
+    const start = vi.fn();
+    const allowAgentRun = vi.fn(async () => false);
+    const r = await run({ runner: { start }, usage: { allowReport: vi.fn(), allowAgentRun } });
+    expect(allowAgentRun).toHaveBeenCalledWith("default");
+    expect(start).not.toHaveBeenCalled();
+    expect(r.run).toMatchObject({ status: "rejected", error: "monthly agent run limit" });
+    expect(r.labelsRemoved).toEqual(["agent:go"]);
+    expect(r.labelsAdded).toEqual(["agent:failed"]);
+    expect(r.comments[0]).toContain("limit for this month");
+  });
+
+  it("does not count runs that are rejected before the limit check", async () => {
+    const allowAgentRun = vi.fn(async () => true);
+    await run({ permission: "triage", runner: { start: vi.fn() }, usage: { allowReport: vi.fn(), allowAgentRun } });
+    expect(allowAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("starts the runner when the limit allows it", async () => {
+    const start = vi.fn(async () => ({ sessionId: "sesn_2" }));
+    const r = await run({ runner: { start }, usage: { allowReport: vi.fn(), allowAgentRun: async () => true } });
+    expect(r.run).toMatchObject({ status: "running", sessionId: "sesn_2" });
   });
 
   it("marks the run failed when the runner cannot start", async () => {

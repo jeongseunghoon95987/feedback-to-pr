@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CommandType, InteractionType, MessageFlags, ResponseType } from "../src/connectors/discord/api";
 import { collectInputValues, handleInteraction } from "../src/connectors/discord/interactions";
 import { baseInteraction, setup } from "./helpers";
@@ -116,6 +116,41 @@ describe("handleInteraction", () => {
     const res = await handleInteraction(modalSubmit("bug", { title: " ", what: "x" }), deps);
     expect(res.data?.flags).toBe(MessageFlags.EPHEMERAL);
     expect(store.reports).toHaveLength(0);
+  });
+
+  it("checks usage for the tenant and reporter before storing", async () => {
+    const { deps, store, jobs } = setup();
+    const allowReport = vi.fn(async () => "ok" as const);
+    const res = await handleInteraction(modalSubmit("bug", { title: "t", what: "x" }), {
+      ...deps,
+      usage: { allowReport, allowAgentRun: vi.fn() },
+    });
+    expect(allowReport).toHaveBeenCalledWith("default", "user-1");
+    expect(res).toEqual({ type: ResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE });
+    expect(store.reports).toHaveLength(1);
+    expect(jobs).toHaveLength(1);
+  });
+
+  it.each([
+    ["user_rate_limited", "last hour"],
+    ["monthly_limit", "limit for this month"],
+  ] as const)("refuses a report when usage says %s", async (decision, text) => {
+    const { deps, store, jobs } = setup();
+    const res = await handleInteraction(modalSubmit("bug", { title: "t", what: "x" }), {
+      ...deps,
+      usage: { allowReport: async () => decision, allowAgentRun: vi.fn() },
+    });
+    expect(res.data?.flags).toBe(MessageFlags.EPHEMERAL);
+    expect(res.data?.content).toContain(text);
+    expect(store.reports).toHaveLength(0);
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("does not count submissions that are invalid", async () => {
+    const { deps } = setup();
+    const allowReport = vi.fn(async () => "ok" as const);
+    await handleInteraction(modalSubmit("bug", { title: " ", what: "x" }), { ...deps, usage: { allowReport, allowAgentRun: vi.fn() } });
+    expect(allowReport).not.toHaveBeenCalled();
   });
 
   it("rejects unknown modal ids", async () => {

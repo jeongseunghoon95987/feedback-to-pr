@@ -117,17 +117,21 @@ GitHub App 설정의 "설치 중 사용자 인증 요청" 옵션을 켜면 이 �
 | 제한 | 베타 기본값 (설정 가능) | 확인 시점 | 넘으면 |
 |---|---|---|---|
 | 신고자별 | 1시간에 5건 | `/bug` 제출 직후 (Queue에 넣기 전) | 본인에게만 보이는 안내 |
-| 서버(테넌트)별 월 분류 | 월 200건 | Queue 처리에서 AI 분류 전 | 분류 없이 이슈 생성 또는 거절 (아래 질문) |
+| 서버(테넌트)별 월 신고 | 월 200건 | `/bug` 제출 직후 (Queue에 넣기 전) | 신고를 받지 않고 본인에게만 보이는 안내 (2026-11-23 결정) |
 | 테넌트별 월 에이전트 실행 | 월 10회 | `agent:go` 처리에서 세션 생성 전 | 이슈에 "이번 달 한도 도달" 댓글, 라벨 `agent:failed` |
 | 실행 1회 비용 | $2 (`AGENT_BUDGET_CENTS`, 이미 있음) | 플랫폼이 강제 | 실행 중지 |
 
 **최악의 경우 비용 (추정)**: 테넌트 하나에 월 200건 × $0.03 + 10회 × $2 = **약 $26/월**. 베타 10팀이면 약 $260/월이 상한이다. 분류를 Haiku로 바꾸면 분류 몫은 거의 0이 된다.
 
-**기록**: `tenant_usage (tenant_id, period 'YYYY-MM', reports_triaged, agent_runs)`. 확인과 증가를 한 문장(`INSERT … ON CONFLICT DO UPDATE … WHERE count < limit RETURNING`)으로 해서 동시에 들어온 요청이 한도를 넘지 않게 한다. 세션이 끝날 때 토큰 사용량도 같이 적어 두면 나중에 요금제 가격을 정할 근거가 된다.
+**기록**: `tenant_usage (tenant_id, period 'YYYY-MM', reports, agent_runs)`. 확인과 증가를 한 문장(`INSERT … ON CONFLICT DO UPDATE … WHERE count < limit RETURNING`)으로 해서 동시에 들어온 요청이 한도를 넘지 않게 한다. 받아들인 일만 센다: 잘못된 입력이나 권한 없는 `agent:go`처럼 앞 단계에서 거절된 것은 세지 않는다. 세션이 끝날 때 토큰 사용량도 같이 적어 두면 나중에 요금제 가격을 정할 근거가 된다 (이후 작업).
 
-셀프 호스팅에도 그대로 쓴다. 기본값을 "제한 없음"으로 두면 지금 동작이 바뀌지 않는다.
+셀프 호스팅에도 그대로 쓴다. 설정하지 않으면 "제한 없음"이라 지금 동작이 바뀌지 않는다. 한도가 없어도 사용량은 센다.
 
-## 데이터 변경 (migration 0005)
+**구현됨 (2026-11-23)**: `migrations/0005_usage.sql`, `src/core/usage.ts`, `src/db/usage.ts`. 설정은 `LIMIT_REPORTS_PER_USER_HOUR`, `LIMIT_REPORTS_PER_MONTH`, `LIMIT_AGENT_RUNS_PER_MONTH`.
+
+## 데이터 변경
+
+사용량 표는 migration 0005로 먼저 들어갔다 (위). 연결 흐름은 migration 0006으로 추가한다.
 
 ```sql
 ALTER TABLE tenants ADD COLUMN plan TEXT NOT NULL DEFAULT 'self_hosted';
@@ -152,14 +156,6 @@ CREATE TABLE invite_codes (
   max_uses INTEGER NOT NULL DEFAULT 1,
   uses INTEGER NOT NULL DEFAULT 0,
   note TEXT
-);
-
-CREATE TABLE tenant_usage (
-  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  period TEXT NOT NULL,             -- 'YYYY-MM' (UTC)
-  reports_triaged INTEGER NOT NULL DEFAULT 0,
-  agent_runs INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (tenant_id, period)
 );
 ```
 
@@ -205,7 +201,7 @@ CREATE TABLE tenant_usage (
 
 ## 구현 순서 (PR 단위)
 
-1. **사용량 제한**: migration 0005의 `tenant_usage`, 신고자별 제한, 분류·에이전트 실행 전 확인. 셀프 호스팅에도 바로 쓸모가 있다
+1. **사용량 제한** ✅: migration 0005의 `tenant_usage`, 신고자별 제한, 신고 접수와 에이전트 실행 전 확인. 셀프 호스팅에도 바로 쓸모가 있다
 2. **연결 흐름**: `/connect`, `/connect/start`, Setup URL, OAuth 콜백, 저장소 선택 화면, 연결 완료 메시지, 라벨 생성. `connect_sessions`, `invite_codes`, unique 인덱스
 3. **해제와 상태**: `/disconnect`, `/status`(연결된 저장소, 이번 달 사용량), `installation` 웹훅 처리
 4. **공개 전환**: GitHub App·Discord 봇 공개 설정, 전역 명령 등록, 이용약관·개인정보처리방침 페이지, README에 "설치하기" 안내

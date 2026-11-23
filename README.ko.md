@@ -90,6 +90,7 @@ feedback-to-pr 자체는 무료(MIT)입니다. 셀프 호스팅하면 Cloudflare
 비용을 줄이려면:
 - `TRIAGE_MODEL=claude-haiku-5-5`로 바꾸면 분류 비용이 신고당 1센트보다 훨씬 적어집니다(100만 토큰당 $0.10 / $0.50). Haiku의 분류 품질은 아직 측정하지 않았습니다.
 - `AGENT_BUDGET_CENTS`를 낮춥니다. 상한이 낮으면 어려운 이슈는 패치 없이 멈출 수 있습니다.
+- 사용량 제한을 겁니다: `LIMIT_REPORTS_PER_USER_HOUR`(Discord 사용자별 시간당), `LIMIT_REPORTS_PER_MONTH`(서버별 월), `LIMIT_AGENT_RUNS_PER_MONTH`(월 에이전트 실행). 비워 두면 제한이 없습니다. 한도를 넘은 신고는 받지 않고 신고자에게만 보이는 안내를 보내며, 한도를 넘은 `agent:go`는 실행하지 않고 이슈에 댓글을 남깁니다.
 - 스팸은 이슈를 만들기 전에 걸러지고, 에이전트는 메인테이너가 승인한 뒤에만 돌아갑니다.
 
 ## 호스팅 버전 요금제 (초안)

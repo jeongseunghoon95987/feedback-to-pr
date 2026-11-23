@@ -2,6 +2,7 @@ import { maskFields, maskText } from "../../core/mask";
 import { t, type Messages } from "../../core/i18n";
 import type { FeedbackReport, ReportFields, ReportJob } from "../../core/types";
 import type { GuildConnection, Store } from "../../db/store";
+import type { UsageGate } from "../../core/usage";
 import {
   CommandType,
   ComponentType,
@@ -18,6 +19,8 @@ import {
 export interface InteractionDeps {
   store: Store;
   enqueue: (job: ReportJob) => Promise<void>;
+  /** Usage limits; without it reports are not limited. */
+  usage?: UsageGate;
 }
 
 const BUG_COMMAND = "bug";
@@ -145,6 +148,11 @@ async function submitModal(
   } else if (customId !== MODAL_BUG) {
     return ephemeral(msg.invalidSubmission);
   }
+
+  // Checked last, after everything that can reject the submission, so only accepted reports are counted.
+  const decision = deps.usage ? await deps.usage.allowReport(connection.tenantId, reporter.id) : "ok";
+  if (decision === "user_rate_limited") return ephemeral(msg.userRateLimited);
+  if (decision === "monthly_limit") return ephemeral(msg.monthlyLimitReached);
 
   const title = maskText(rawTitle.slice(0, Limits.REPORT_TITLE));
   const masked = maskFields<ReportFields>({
