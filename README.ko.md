@@ -75,6 +75,8 @@ Cloudflare 계정, Discord 애플리케이션, GitHub App, Claude API 키가 필
    - Claude Console → Webhooks: `https://<내 Worker>/anthropic/webhook`, 이벤트 `session.status_idled`, `session.status_terminated`, `session.budget_reached`. 표시되는 서명 키를 `npx wrangler secret put ANTHROPIC_WEBHOOK_SIGNING_KEY`로 넣습니다.
    - `npm run register-commands`로 `/bug` 명령을 등록합니다.
 
+**선택: seed SQL 대신 Discord에서 연결하기.** GitHub App 설정에서 Callback URL을 `https://<내 Worker>/connect/github/callback`, Setup URL을 `https://<내 Worker>/connect/github/setup`("Redirect on update" 켜기)으로 넣고 Client secret을 만든 뒤, `PUBLIC_BASE_URL`, `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`을 설정합니다. 그러면 서버 관리 권한이 있는 멤버가 `/connect`를 실행해 GitHub에 로그인하고, 자기가 관리하는 저장소를 고르면 연결됩니다. `CONNECT_INVITE_REQUIRED=true`면 `invite_codes` 테이블의 초대 코드가 필요합니다. 설계: [docs/design/hosted-onboarding.md](docs/design/hosted-onboarding.md)
+
 서버에서 `/bug`로 시험해 보세요. 짧은 테스트 문구는 보통 스팸으로 분류되어 이슈 없이 닫히고, 구체적인 신고는 이슈가 됩니다. 그 이슈에 `agent:go`를 붙이면 Draft PR이 만들어집니다. `npx wrangler tail`로 들어오는 요청을 볼 수 있습니다.
 
 ## 비용

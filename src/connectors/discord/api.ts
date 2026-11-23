@@ -26,7 +26,18 @@ export const CommandType = {
 
 export const ComponentType = {
   ACTION_ROW: 1,
+  BUTTON: 2,
   TEXT_INPUT: 4,
+} as const;
+
+export const ButtonStyle = {
+  LINK: 5,
+} as const;
+
+/** Permission bits from the Discord docs. */
+export const Permission = {
+  ADMINISTRATOR: 1n << 3n,
+  MANAGE_GUILD: 1n << 5n,
 } as const;
 
 export const TextInputStyle = {
@@ -69,10 +80,12 @@ export interface Interaction {
   guild_id?: string;
   channel_id?: string;
   locale?: string;
-  member?: { user: DiscordUser };
+  /** permissions: the member's computed permissions in the channel, as a decimal bit set. */
+  member?: { user: DiscordUser; permissions?: string };
   user?: DiscordUser;
   data?: {
     name?: string;
+    options?: { name: string; type: number; value?: string | number | boolean }[];
     type?: number;
     target_id?: string;
     custom_id?: string;

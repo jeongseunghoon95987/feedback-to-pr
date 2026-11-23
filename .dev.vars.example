@@ -33,6 +33,16 @@ AGENT_BUDGET_CENTS=
 LIMIT_REPORTS_PER_USER_HOUR=
 LIMIT_REPORTS_PER_MONTH=
 LIMIT_AGENT_RUNS_PER_MONTH=
+
+# /connect onboarding (optional): server admins connect a repository from Discord
+# instead of seed SQL. All four are needed. GitHub App settings: Callback URL
+# https://<worker>/connect/github/callback, Setup URL https://<worker>/connect/github/setup
+PUBLIC_BASE_URL=
+GITHUB_APP_SLUG=
+GITHUB_APP_CLIENT_ID=
+GITHUB_APP_CLIENT_SECRET=
+# "true" makes /connect require an invite code (rows in the invite_codes table)
+CONNECT_INVITE_REQUIRED=
 # Claude Console -> Webhooks: endpoint https://<worker>/anthropic/webhook, events
 # session.status_idled, session.status_terminated, session.budget_reached
 ANTHROPIC_WEBHOOK_SIGNING_KEY=

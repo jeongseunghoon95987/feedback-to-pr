@@ -15,6 +15,10 @@ import { ManagedAgentRunner, ManagedAgentSessions, type AgentSessions } from "./
 import type { AppCredentials } from "./github/auth";
 import { parseLimits, type LimitConfig } from "./core/usage";
 import { D1UsageGate } from "./db/usage";
+import { getCookie } from "hono/cookie";
+import { CONNECT_COOKIE, afterInstall, confirmConnect, oauthCallback, startConnect, type ConnectDeps } from "./connect/flow";
+import type { ConnectCommandDeps } from "./connect/command";
+import { D1ConnectStore } from "./connect/store";
 
 /** Reports and agent work share one queue; agent jobs carry a `kind`. */
 export type QueueJob = ReportJob | AgentJob | AgentCompleteJob;
@@ -43,6 +47,34 @@ export interface Env extends TriageConfig, LimitConfig {
   AGENT_BUDGET_CENTS?: string;
   /** Signing key (whsec_...) of the Managed Agents webhook endpoint registered in the Claude Console. */
   ANTHROPIC_WEBHOOK_SIGNING_KEY?: string;
+  /** /connect onboarding. All four are needed; without them /connect says it is not set up. */
+  PUBLIC_BASE_URL?: string;
+  GITHUB_APP_SLUG?: string;
+  GITHUB_APP_CLIENT_ID?: string;
+  GITHUB_APP_CLIENT_SECRET?: string;
+  /** "true" makes /connect require an invite code (closed beta). */
+  CONNECT_INVITE_REQUIRED?: string;
+}
+
+/** Calling the Workers global as `deps.fetch(...)` throws "Illegal invocation", so wrap it. */
+const workerFetch: typeof fetch = (input, init) => fetch(input, init);
+
+function connectDepsFrom(env: Env): ConnectDeps | null {
+  const baseUrl = env.PUBLIC_BASE_URL?.trim().replace(/\/+$/, "");
+  if (!baseUrl || !env.GITHUB_APP_SLUG || !env.GITHUB_APP_CLIENT_ID || !env.GITHUB_APP_CLIENT_SECRET) return null;
+  return {
+    store: new D1ConnectStore(env.DB),
+    oauth: { slug: env.GITHUB_APP_SLUG, clientId: env.GITHUB_APP_CLIENT_ID, clientSecret: env.GITHUB_APP_CLIENT_SECRET },
+    baseUrl,
+    github: githubCredentials(env),
+    discordBotToken: env.DISCORD_BOT_TOKEN,
+    fetch: workerFetch,
+  };
+}
+
+function connectCommandFrom(env: Env): ConnectCommandDeps | null {
+  const deps = connectDepsFrom(env);
+  return deps ? { store: deps.store, baseUrl: deps.baseUrl, inviteRequired: env.CONNECT_INVITE_REQUIRED === "true" } : null;
 }
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -72,8 +104,40 @@ app.post("/discord/interactions", async (c) => {
       await c.env.REPORTS_QUEUE.send(job);
     },
     usage: new D1UsageGate(c.env.DB, parseLimits(c.env)),
+    connect: connectCommandFrom(c.env),
   });
   return c.json(response);
+});
+
+/** Browser side of /connect. See src/connect/flow.ts. */
+app.get("/connect/start", async (c) => {
+  const deps = connectDepsFrom(c.env);
+  if (!deps) return c.notFound();
+  return startConnect(c.req.query("t"), deps);
+});
+
+app.get("/connect/github/setup", async (c) => {
+  const deps = connectDepsFrom(c.env);
+  if (!deps) return c.notFound();
+  return afterInstall(getCookie(c, CONNECT_COOKIE), deps);
+});
+
+app.get("/connect/github/callback", async (c) => {
+  const deps = connectDepsFrom(c.env);
+  if (!deps) return c.notFound();
+  return oauthCallback(
+    getCookie(c, CONNECT_COOKIE),
+    { state: c.req.query("state"), code: c.req.query("code"), error: c.req.query("error") },
+    deps,
+  );
+});
+
+app.post("/connect/github/confirm", async (c) => {
+  const deps = connectDepsFrom(c.env);
+  if (!deps) return c.notFound();
+  const form = await c.req.parseBody();
+  const field = (name: string) => (typeof form[name] === "string" ? (form[name] as string) : undefined);
+  return confirmConnect(getCookie(c, CONNECT_COOKIE), { token: field("token"), repo: field("repo") }, deps);
 });
 
 /**
